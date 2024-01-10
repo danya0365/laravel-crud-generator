@@ -97,17 +97,17 @@ class ModelGenerator
                 $this->properties .= "\n * @property $model $$relationName";
                 break;
             case 'hasMany':
-                $this->properties .= "\n * @property ".$model."[] $$relationName";
+                $this->properties .= "\n * @property " . $model . "[] $$relationName";
                 break;
         }
 
         return '
     /**
-     * @return \Illuminate\Database\Eloquent\Relations\\'.$relClass.'
+     * @return \Illuminate\Database\Eloquent\Relations\\' . $relClass . '
      */
-    public function '.$relationName.'()
+    public function ' . $relationName . '()
     {
-        return $this->'.$relation.'(\''.$this->modelNamespace.'\\'.$model.'\', \''.$foreign_key.'\', \''.$local_key.'\');
+        return $this->' . $relation . '(\'' . $this->modelNamespace . '\\' . $model . '\', \'' . $foreign_key . '\', \'' . $local_key . '\');
     }
     ';
     }
@@ -144,6 +144,24 @@ class ModelGenerator
      */
     private function _getTableRelations()
     {
+        $db_connection = config('crud.db_connection', 'mysql');
+        if ($db_connection === 'pgsql') {
+            $db = DB::getDatabaseName();
+            $sql = <<<SQL
+    SELECT TABLE_NAME ref_table, COLUMN_NAME foreign_key, REFERENCED_COLUMN_NAME local_key, '1' ref 
+      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+      WHERE REFERENCED_TABLE_NAME = '$this->table' AND TABLE_SCHEMA = '$db'
+    UNION
+    SELECT REFERENCED_TABLE_NAME ref_table, REFERENCED_COLUMN_NAME foreign_key, COLUMN_NAME local_key, '0' ref 
+      FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE 
+      WHERE TABLE_NAME = '$this->table' AND TABLE_SCHEMA = '$db' AND REFERENCED_TABLE_NAME IS NOT NULL 
+    
+    ORDER BY ref_table ASC
+SQL;
+
+            return DB::select($sql);
+        }
+
         $db = DB::getDatabaseName();
         $sql = <<<SQL
 SELECT TABLE_NAME ref_table, COLUMN_NAME foreign_key, REFERENCED_COLUMN_NAME local_key, '1' ref 
